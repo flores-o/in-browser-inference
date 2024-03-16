@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ONNX Runtime Web Inference</title>
+</head>
+<body>
+  <h1>ONNX Runtime Web Inference</h1>
+  <p>Predicted class id: <span id="predicted-class-id"></span></p>
+  <p>Prediction: <span id="prediction"></span></p>
+  <p>Inference time: <span id="inference-time"></span> ms</p>
+
+  <!-- ONNXRuntime Web import -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
+  <script type="module">
+    import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
+  
+    async function runInference() {
+      try {
+        // Model and tokenizer initialization
+        // Model and tokenizer source https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/tree/main
+        const session = await ort.InferenceSession.create('models/Xenova/distilbert-base-uncased-finetuned-sst-2-english/onnx/model_quantized.onnx');
+        const tokenizer = await AutoTokenizer.from_pretrained('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+
+        // Text preparation and tokenization
+        const text = 'Hello, my dog is cute';
+        const tokenized = tokenizer(text, {
+          addSpecialTokens: true,
+          padding: true,
+          returnAttentionMask: true,
+        });
+  
+        // Input preparation
+        const inputTensor = new Int32Array(tokenized.ids);
+        const attentionMaskTensor = new Int32Array(tokenized.attention_mask);
+        const inputData = {
+          input_ids: new ort.Tensor('int32', inputTensor, [1, inputTensor.length]),
+          attention_mask: new ort.Tensor('int32', attentionMaskTensor, [1, attentionMaskTensor.length])
+        };
+
+        // Inference execution
+        const startTime = performance.now();
+        const outputs = await session.run(inputData);
+        const endTime = performance.now();
+
+        // Result processing
+        const inferenceTime = endTime - startTime;
+        const predictedClassId = outputs.output.data.indexOf(Math.max(...outputs.output.data));
+        const prediction = predictedClassId === 0 ? 'Negative' : 'Positive';
+
+        // Display results
+        document.getElementById('predicted-class-id').textContent = predictedClassId;
+        document.getElementById('prediction').textContent = prediction;
+        document.getElementById('inference-time').textContent = inferenceTime.toFixed(2);
+      } catch (error) {
+        console.error('Inference error:', error);
+      }
+    }
+  
+    runInference();
+  </script>
+</body>
+</html>
