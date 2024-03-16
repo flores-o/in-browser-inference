@@ -29,24 +29,29 @@
           padding: true,
           returnAttentionMask: true,
         });
-  
-        // Input preparation
-        const inputTensor = new Int32Array(tokenized.ids);
-        const attentionMaskTensor = new Int32Array(tokenized.attention_mask);
+
+        console.log("tokenized.input_ids", tokenized.input_ids);
+        // tokenized.input_ids and tokenized.attention_mask are similar in structure
+        // and their `data` properties contain BigInt64Array
         const inputData = {
-          input_ids: new ort.Tensor('int32', inputTensor, [1, inputTensor.length]),
-          attention_mask: new ort.Tensor('int32', attentionMaskTensor, [1, attentionMaskTensor.length])
+          input_ids: new ort.Tensor('int64', tokenized.input_ids.data, [1, tokenized.input_ids.data.length]),
+          attention_mask: new ort.Tensor('int64', tokenized.attention_mask.data, [1, tokenized.attention_mask.data.length])
         };
 
         // Inference execution
         const startTime = performance.now();
         const outputs = await session.run(inputData);
         const endTime = performance.now();
+        const inferenceTime = endTime - startTime; 
 
-        // Result processing
-        const inferenceTime = endTime - startTime;
-        const predictedClassId = outputs.output.data.indexOf(Math.max(...outputs.output.data));
+
+        console.log("outputs", outputs);
+
+        // `outputs.logits.cpuData` contains the inference results
+        const logitsData = outputs.logits.cpuData;
+        const predictedClassId = logitsData.indexOf(Math.max(...logitsData));
         const prediction = predictedClassId === 0 ? 'Negative' : 'Positive';
+
 
         // Display results
         document.getElementById('predicted-class-id').textContent = predictedClassId;
