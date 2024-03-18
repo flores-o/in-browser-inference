@@ -5,6 +5,9 @@
 </head>
 <body>
   <h1>ONNX Runtime Web Inference</h1>
+  <label for="user-text">Enter text:</label>
+  <input type="text" id="user-text" placeholder="Your text here" />
+  <button id="classify-btn">Classify Text</button>
   <p>Predicted class id: <span id="predicted-class-id"></span></p>
   <p>Prediction: <span id="prediction"></span></p>
   <p>Inference time: <span id="inference-time"></span> ms</p>
@@ -14,46 +17,32 @@
 
   <script type="module">
     import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
-  
-    async function runInference() {
+
+    async function runInference(text) {
       try {
-        // Model and tokenizer initialization
-        // Model and tokenizer source https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/tree/main
         const session = await ort.InferenceSession.create('models/Xenova/distilbert-base-uncased-finetuned-sst-2-english/onnx/model_quantized.onnx');
         const tokenizer = await AutoTokenizer.from_pretrained('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
 
-        // Text preparation and tokenization
-        const text = 'Hello, my dog is cute';
         const tokenized = tokenizer(text, {
           addSpecialTokens: true,
           padding: true,
           returnAttentionMask: true,
         });
 
-        console.log("tokenized.input_ids", tokenized.input_ids);
-        // tokenized.input_ids and tokenized.attention_mask are similar in structure
-        // and their `data` properties contain BigInt64Array
         const inputData = {
           input_ids: new ort.Tensor('int64', tokenized.input_ids.data, [1, tokenized.input_ids.data.length]),
           attention_mask: new ort.Tensor('int64', tokenized.attention_mask.data, [1, tokenized.attention_mask.data.length])
         };
 
-        // Inference execution
         const startTime = performance.now();
         const outputs = await session.run(inputData);
         const endTime = performance.now();
-        const inferenceTime = endTime - startTime; 
+        const inferenceTime = endTime - startTime;
 
-
-        console.log("outputs", outputs);
-
-        // `outputs.logits.cpuData` contains the inference results
         const logitsData = outputs.logits.cpuData;
         const predictedClassId = logitsData.indexOf(Math.max(...logitsData));
         const prediction = predictedClassId === 0 ? 'Negative' : 'Positive';
 
-
-        // Display results
         document.getElementById('predicted-class-id').textContent = predictedClassId;
         document.getElementById('prediction').textContent = prediction;
         document.getElementById('inference-time').textContent = inferenceTime.toFixed(2);
@@ -61,8 +50,15 @@
         console.error('Inference error:', error);
       }
     }
-  
-    runInference();
+
+    document.getElementById('classify-btn').addEventListener('click', () => {
+      const userText = document.getElementById('user-text').value;
+      if (!userText) {
+        alert("Please enter some text.");
+        return;
+      }
+      runInference(userText);
+    });
   </script>
 </body>
 </html>
