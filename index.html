@@ -20,7 +20,7 @@
 
     async function runInference(text) {
       try {
-        const session = await ort.InferenceSession.create('models/Xenova/distilbert-base-uncased-finetuned-sst-2-english/onnx/model_quantized.onnx');
+        const session = await ort.InferenceSession.create('models/Xenova/distilbert-base-uncased-finetuned-sst-2-english/onnx/distilbert.onnx');
         const tokenizer = await AutoTokenizer.from_pretrained('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
 
         const tokenized = tokenizer(text, {

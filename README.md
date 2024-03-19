@@ -14,7 +14,6 @@ This repository provides an example of performing inference using a pre-trained 
 - **package.json, package-lock.json:** These files manage the dependencies required for the web application.
 
 
-
 **Running the demo:**
 
 ``` 
