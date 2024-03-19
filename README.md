@@ -15,7 +15,7 @@ This repository provides an example of performing inference using a pre-trained 
 
 
 
-# onnxruntime-web-demo
+**Running the demo:**
 
 ``` 
 npm install -g http-server
