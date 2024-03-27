@@ -85,23 +85,6 @@
 
         document.getElementById('generated-text-id').textContent = decodedText;
         document.getElementById('stats').textContent = `Inference time: ${inferenceTime.toFixed(2)} ms`;
-
-
-        // // Example of manually creating a tensor with 'int64' data
-        // const manualInputIds = new ort.Tensor('int64', new BigInt64Array([1n, 2n, 3n, 4n]), [1, 4]); // Adjust shape as needed
-        // const manualAttentionMask = new ort.Tensor('int64', new BigInt64Array([1n, 1n, 1n, 1n]), [1, 4]); // Adjust shape as needed
-        // const manualFeeds = {
-        //   input_ids: manualInputIds,
-        //   attention_mask: manualAttentionMask,
-        // };
-
-        // try {
-        //   const manualResults = await session.run(manualFeeds);
-        //   console.log("Manual run successful:", manualResults);
-        // } catch (error) {
-        //   console.log("Error in manual run:", error);
-        // }
-
       } catch (error) {
         console.error('Inference error:', error);
       }
