@@ -13,86 +13,89 @@
 
   <!-- ONNXRuntime Web import -->
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
-
+  <!-- Transformers import -->
   <script type="module">
+    // External module imports
     import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
+    // Initialize the inference session and tokenizer
+    async function initializeModelAndTokenizer() {
+      const session = await ort.InferenceSession.create('models/Xenova/gpt2/onnx/decoder_model_quantized.onnx');
+      const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
+      return { session, tokenizer };
+    }
+
+    // Prepare inputs for the model
+    function prepareModelInputs(tokenizer, texts) {
+      tokenizer.padding_side = 'left';
+      const { input_ids, attention_mask } = tokenizer(texts, {
+        add_special_tokens: false,
+        padding: true,
+        truncation: true,
+      });
+      return { input_ids, attention_mask };
+    }
+
+    // Run inference using ONNX Runtime
     async function runInference(texts) {
       try {
-        const session = await ort.InferenceSession.create('models/Xenova/gpt2/onnx/decoder_model_quantized.onnx');
-
+        const { session, tokenizer } = await initializeModelAndTokenizer();
         console.log("Model Inputs:", session.inputNames);
         console.log("Model Outputs:", session.outputNames);
 
-        const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
-
         const isBatched = Array.isArray(texts);
-        if (!isBatched) {
-            texts = [/** @type {string}*/ (texts)];
-        }
+        texts = isBatched ? texts : [texts];
 
-        tokenizer.padding_side = 'left';
-        const { input_ids, attention_mask } = tokenizer(texts, {
-            add_special_tokens: false,
-            padding: true,
-            truncation: true,
-        });
+        const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
 
-        // Continue from the previous code snippet...
-
-        console.log("input_ids:", input_ids);
-        console.log("Type of input_ids:", typeof input_ids);
-        if (Array.isArray(input_ids) && input_ids.length > 0) {
-          console.log("Type of input_ids[0]:", typeof input_ids[0], Array.isArray(input_ids[0]));
-        }
-
-        const manualFeeds = {
+        const feeds = {
           input_ids: new ort.Tensor('int64', input_ids.data, [1, input_ids.data.length]),
           attention_mask: new ort.Tensor('int64', attention_mask.data, [1, attention_mask.data.length])
         };
 
-
         const startTime = performance.now();
-        const manualResults = await session.run(manualFeeds);
+        const results = await session.run(feeds);
         const endTime = performance.now();
+
         const inferenceTime = endTime - startTime;
+        console.log("Inference time:", inferenceTime, "ms");
 
-        console.log("Manual run successful:", manualResults);
-      
-        // Placeholder for the logits array
-        const logitsArray = manualResults.logits.cpuData;
-
-        // Placeholder for dimensions, extracted from `manualResults`
-        const sequenceLength = manualResults.logits.dims[1];
-        const vocabSize = manualResults.logits.dims[2];
-
-        // Decode each position in the sequence
-        let tokenIds = [];
-        for (let i = 0; i < sequenceLength; i++) {
-            // Extract the slice of logits for this position across all vocab
-            let start = i * vocabSize;
-            let end = start + vocabSize;
-            let logitsSlice = logitsArray.slice(start, end);
-
-            // Find the index of the max logit value in this slice
-            let maxLogitIndex = logitsSlice.indexOf(Math.max(...logitsSlice));
-            tokenIds.push(maxLogitIndex);
-        }
-
-        // Now decode the tokenIds to text
-        let decodedText = tokenizer.decode(tokenIds);
-        console.log("Decoded Text:", decodedText);
-
-        document.getElementById('generated-text-id').textContent = decodedText;
-        document.getElementById('stats').textContent = `Inference time: ${inferenceTime.toFixed(2)} ms`;
+        // Decode and display results
+        const decodedText = decodeResults(tokenizer, results.logits);
+        displayResults(decodedText, inferenceTime);
       } catch (error) {
         console.error('Inference error:', error);
       }
     }
 
+    // Decode logits to text
+    function decodeResults(tokenizer, logitsTensor) {
+      const sequenceLength = logitsTensor.dims[1];
+      const vocabSize = logitsTensor.dims[2];
+      const logitsArray = logitsTensor.cpuData;
+      let tokenIds = [];
+
+      for (let i = 0; i < sequenceLength; i++) {
+        let start = i * vocabSize;
+        let end = start + vocabSize;
+        let logitsSlice = logitsArray.slice(start, end);
+        let maxLogitIndex = logitsSlice.indexOf(Math.max(...logitsSlice));
+        tokenIds.push(maxLogitIndex);
+      }
+
+      return tokenizer.decode(tokenIds);
+    }
+
+    // Display the results on the web page
+    function displayResults(decodedText, inferenceTime) {
+      document.getElementById('generated-text-id').textContent = decodedText;
+      document.getElementById('stats').textContent = `Inference time: ${inferenceTime.toFixed(2)} ms`;
+    }
+
+    // Set up event listener for the Generate button
     document.getElementById('generate-btn').addEventListener('click', () => {
-      const userText = document.getElementById('user-text').value;
-      if (!userText) {
+      const userText = document.getElementById('user-text').value.trim();
+      if (userText === "") {
         alert("Please enter some text.");
         return;
       }
