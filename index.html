@@ -7,10 +7,9 @@
   <h1>ONNX Runtime Web Inference</h1>
   <label for="user-text">Enter text:</label>
   <input type="text" id="user-text" placeholder="Your text here" />
-  <button id="classify-btn">Classify Text</button>
-  <p>Predicted class id: <span id="predicted-class-id"></span></p>
-  <p>Prediction: <span id="prediction"></span></p>
-  <p>Inference time: <span id="inference-time"></span> ms</p>
+  <button id="generate-btn">Generate</button>
+  <p>Generated text: <span id="generated-text-id"></span></p>
+  <p>Stats: <span id="stats"></span></p>
 
   <!-- ONNXRuntime Web import -->
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
@@ -18,40 +17,97 @@
   <script type="module">
     import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
-    async function runInference(text) {
+    async function runInference(texts) {
       try {
-        const session = await ort.InferenceSession.create('models/Xenova/distilbert-base-uncased-finetuned-sst-2-english/onnx/distilbert.onnx');
-        const tokenizer = await AutoTokenizer.from_pretrained('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+        const session = await ort.InferenceSession.create('models/Xenova/gpt2/onnx/decoder_model_quantized.onnx');
 
-        const tokenized = tokenizer(text, {
-          addSpecialTokens: true,
-          padding: true,
-          returnAttentionMask: true,
+        console.log("Model Inputs:", session.inputNames);
+        console.log("Model Outputs:", session.outputNames);
+
+        const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
+
+        const isBatched = Array.isArray(texts);
+        if (!isBatched) {
+            texts = [/** @type {string}*/ (texts)];
+        }
+
+        tokenizer.padding_side = 'left';
+        const { input_ids, attention_mask } = tokenizer(texts, {
+            add_special_tokens: false,
+            padding: true,
+            truncation: true,
         });
 
-        const inputData = {
-          input_ids: new ort.Tensor('int64', tokenized.input_ids.data, [1, tokenized.input_ids.data.length]),
-          attention_mask: new ort.Tensor('int64', tokenized.attention_mask.data, [1, tokenized.attention_mask.data.length])
+        // Continue from the previous code snippet...
+
+        console.log("input_ids:", input_ids);
+        console.log("Type of input_ids:", typeof input_ids);
+        if (Array.isArray(input_ids) && input_ids.length > 0) {
+          console.log("Type of input_ids[0]:", typeof input_ids[0], Array.isArray(input_ids[0]));
+        }
+
+        const manualFeeds = {
+          input_ids: new ort.Tensor('int64', input_ids.data, [1, input_ids.data.length]),
+          attention_mask: new ort.Tensor('int64', attention_mask.data, [1, attention_mask.data.length])
         };
 
+
         const startTime = performance.now();
-        const outputs = await session.run(inputData);
+        const manualResults = await session.run(manualFeeds);
         const endTime = performance.now();
         const inferenceTime = endTime - startTime;
 
-        const logitsData = outputs.logits.cpuData;
-        const predictedClassId = logitsData.indexOf(Math.max(...logitsData));
-        const prediction = predictedClassId === 0 ? 'Negative' : 'Positive';
+        console.log("Manual run successful:", manualResults);
+      
+        // Placeholder for the logits array
+        const logitsArray = manualResults.logits.cpuData;
 
-        document.getElementById('predicted-class-id').textContent = predictedClassId;
-        document.getElementById('prediction').textContent = prediction;
-        document.getElementById('inference-time').textContent = inferenceTime.toFixed(2);
+        // Placeholder for dimensions, extracted from `manualResults`
+        const sequenceLength = manualResults.logits.dims[1];
+        const vocabSize = manualResults.logits.dims[2];
+
+        // Decode each position in the sequence
+        let tokenIds = [];
+        for (let i = 0; i < sequenceLength; i++) {
+            // Extract the slice of logits for this position across all vocab
+            let start = i * vocabSize;
+            let end = start + vocabSize;
+            let logitsSlice = logitsArray.slice(start, end);
+
+            // Find the index of the max logit value in this slice
+            let maxLogitIndex = logitsSlice.indexOf(Math.max(...logitsSlice));
+            tokenIds.push(maxLogitIndex);
+        }
+
+        // Now decode the tokenIds to text
+        let decodedText = tokenizer.decode(tokenIds);
+        console.log("Decoded Text:", decodedText);
+
+        document.getElementById('generated-text-id').textContent = decodedText;
+        document.getElementById('stats').textContent = `Inference time: ${inferenceTime.toFixed(2)} ms`;
+
+
+        // // Example of manually creating a tensor with 'int64' data
+        // const manualInputIds = new ort.Tensor('int64', new BigInt64Array([1n, 2n, 3n, 4n]), [1, 4]); // Adjust shape as needed
+        // const manualAttentionMask = new ort.Tensor('int64', new BigInt64Array([1n, 1n, 1n, 1n]), [1, 4]); // Adjust shape as needed
+        // const manualFeeds = {
+        //   input_ids: manualInputIds,
+        //   attention_mask: manualAttentionMask,
+        // };
+
+        // try {
+        //   const manualResults = await session.run(manualFeeds);
+        //   console.log("Manual run successful:", manualResults);
+        // } catch (error) {
+        //   console.log("Error in manual run:", error);
+        // }
+
       } catch (error) {
         console.error('Inference error:', error);
       }
     }
 
-    document.getElementById('classify-btn').addEventListener('click', () => {
+    document.getElementById('generate-btn').addEventListener('click', () => {
       const userText = document.getElementById('user-text').value;
       if (!userText) {
         alert("Please enter some text.");
