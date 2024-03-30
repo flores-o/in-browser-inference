@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ONNX Runtime Web Inference</title>
+  <title>Tensorflow JS Inference</title>
 </head>
 <body>
-  <h1>ONNX Runtime Web Inference</h1>
+  <h1>Tensorflow JS Inference</h1>
   <label for="user-text">Enter text:</label>
   <input type="text" id="user-text" placeholder="Your text here" />
   <button id="generate-btn">Generate</button>
@@ -12,7 +12,7 @@
   <p>Stats: <span id="stats"></span></p>
 
   <!-- ONNXRuntime Web import -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
   <!-- Transformers import -->
   <script type="module">
 
@@ -21,9 +21,10 @@
 
       // Initialize the inference session and tokenizer
       async function initializeModelAndTokenizer() {
-        const session = await ort.InferenceSession.create('models/Xenova/gpt2/onnx/decoder_model_quantized.onnx');
+        const model = await tf.loadGraphModel('./models/Xenova/gpt2/tfjs_model/model.json');
+        console.log('Model loaded');
         const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
-        return { session, tokenizer };
+        return { model, tokenizer };
       }
 
       // Prepare inputs for the model
@@ -41,7 +42,7 @@
       async function runInference(texts) {
         try {
           const prefillStartTime = performance.now();
-          const { session, tokenizer } = await initializeModelAndTokenizer();
+          const { model, tokenizer } = await initializeModelAndTokenizer();
           
           const isBatched = Array.isArray(texts);
           texts = isBatched ? texts : [texts];
@@ -55,6 +56,9 @@
           };
 
           const inferenceStartTime = performance.now();
+          // console log execution provider
+          // get average over 10 - 100 runs
+          // 
           const results = await session.run(feeds);
           const inferenceEndTime = performance.now();
 

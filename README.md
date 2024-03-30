@@ -16,6 +16,11 @@ This repository provides an example of performing inference using a pre-trained 
 
 **Running the demo:**
 
+
+```
+# for running the demo on the gpt2-tfjs branch, download the tfjs model from https://drive.google.com/file/d/1-0hYojp6SbpzH7xJjgNUIed8OS0smcrl/view?usp=drive_link and save it in /models/Xenova/gpt2/tfjs_model
+todo: upload the model to artifactory
+```
 ``` 
 npm install -g http-server
 http-server -p 8081 --cors
