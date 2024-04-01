@@ -1,121 +1,60 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ONNX Runtime Web Inference</title>
+  <title>ONNX Runtime Web Inference - Performance Measurement</title>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <script type="module">
+    import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
+
+    async function runInferenceBenchmark() {
+      const { session, tokenizer } = await initializeModelAndTokenizer();
+      const texts = ["Your sample text here"]; // Replace with your input
+      const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
+      const feeds = {
+        input_ids: new ort.Tensor('int64', input_ids.data, [1, input_ids.data.length]),
+        attention_mask: new ort.Tensor('int64', attention_mask.data, [1, attention_mask.data.length])
+      };
+
+      // Warm-up runs
+      for (let i = 0; i < 3; i++) {
+        await session.run(feeds);
+      }
+
+      // Benchmark runs
+      const runTimes = [];
+      for (let i = 0; i < 10; i++) {
+        const startTime = performance.now();
+        await session.run(feeds);
+        const endTime = performance.now();
+        runTimes.push(endTime - startTime);
+      }
+
+      // Calculate average time excluding warm-up
+      const averageTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
+      console.log(`Average Inference Time (ONNX): ${averageTime.toFixed(2)} ms`);
+    }
+
+    async function initializeModelAndTokenizer() {
+      const session = await ort.InferenceSession.create('models/Xenova/gpt2/onnx/decoder_model_quantized.onnx');
+      const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
+      return { session, tokenizer };
+    }
+
+    function prepareModelInputs(tokenizer, texts) {
+      tokenizer.padding_side = 'left';
+      const { input_ids, attention_mask } = tokenizer(texts, {
+        add_special_tokens: false,
+        padding: true,
+        truncation: true,
+      });
+      return { input_ids, attention_mask, totalInputTokens: input_ids.data.length };
+    }
+
+    // Run the benchmark
+    runInferenceBenchmark();
+  </script>
 </head>
 <body>
-  <h1>ONNX Runtime Web Inference</h1>
-  <label for="user-text">Enter text:</label>
-  <input type="text" id="user-text" placeholder="Your text here" />
-  <button id="generate-btn">Generate</button>
-  <p>Generated text: <span id="generated-text-id"></span></p>
-  <p>Stats: <span id="stats"></span></p>
-
-  <!-- ONNXRuntime Web import -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
-  <!-- Transformers import -->
-  <script type="module">
-
-          // External module imports
-      import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
-
-      // Initialize the inference session and tokenizer
-      async function initializeModelAndTokenizer() {
-        const session = await ort.InferenceSession.create('models/Xenova/gpt2/onnx/decoder_model_quantized.onnx');
-        const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
-        return { session, tokenizer };
-      }
-
-      // Prepare inputs for the model
-      function prepareModelInputs(tokenizer, texts) {
-        tokenizer.padding_side = 'left';
-        const { input_ids, attention_mask } = tokenizer(texts, {
-          add_special_tokens: false,
-          padding: true,
-          truncation: true,
-        });
-        // Now returns the length of input_ids as totalInputTokens for prefill performance measurement
-        return { input_ids, attention_mask, totalInputTokens: input_ids.data.length };
-      }
-
-      async function runInference(texts) {
-        try {
-          const prefillStartTime = performance.now();
-          const { session, tokenizer } = await initializeModelAndTokenizer();
-          
-          const isBatched = Array.isArray(texts);
-          texts = isBatched ? texts : [texts];
-          
-          const { input_ids, attention_mask, totalInputTokens } = prepareModelInputs(tokenizer, texts);
-          const prefillEndTime = performance.now();
-          
-          const feeds = {
-            input_ids: new ort.Tensor('int64', input_ids.data, [1, input_ids.data.length]),
-            attention_mask: new ort.Tensor('int64', attention_mask.data, [1, attention_mask.data.length])
-          };
-
-          const inferenceStartTime = performance.now();
-          const results = await session.run(feeds);
-          const inferenceEndTime = performance.now();
-
-          const prefillTime = prefillEndTime - prefillStartTime;
-          const inferenceTime = inferenceEndTime - inferenceStartTime;
-
-          // Use totalInputTokens for prefillTokensPerSecond calculation
-          const prefillTokensPerSecond = totalInputTokens / (prefillTime / 1000);
-
-          // Decoding tokens/sec is calculated using the output token count
-          const decodedText = decodeResults(tokenizer, results.logits);
-          // Assuming the decodeResults function returns the number of decoded tokens as well
-          const { decodedTokens, text } = decodedText;
-          const decodingTokensPerSecond = decodedTokens / (inferenceTime / 1000);
-
-          console.log("Prefill tokens/sec:", prefillTokensPerSecond);
-          console.log("Decoding tokens/sec:", decodingTokensPerSecond);
-
-          displayResults(text, inferenceTime, prefillTokensPerSecond, decodingTokensPerSecond);
-        } catch (error) {
-          console.error('Inference error:', error);
-        }
-      }
-
-      // Decode logits to text and return both text and token count
-      function decodeResults(tokenizer, logitsTensor) {
-        const sequenceLength = logitsTensor.dims[1]; // Assuming dims[1] gives the sequence length
-        const vocabSize = logitsTensor.dims[2]; // Assuming dims[2] gives the vocab size
-        const logitsArray = logitsTensor.data; // Assuming data gives the logits
-        let tokenIds = [];
-
-        for (let i = 0; i < sequenceLength; i++) {
-          let start = i * vocabSize;
-          let end = start + vocabSize;
-          let logitsSlice = logitsArray.slice(start, end);
-          let maxLogitIndex = logitsSlice.indexOf(Math.max(...logitsSlice));
-          tokenIds.push(maxLogitIndex);
-        }
-
-        const text = tokenizer.decode(tokenIds);
-        // Returns both the text and the count of decoded tokens
-        return { decodedTokens: tokenIds.length, text };
-      }
-
-      // Updated displayResults function to include tokens per second metrics
-      function displayResults(decodedText, inferenceTime, prefillTokensPerSecond, decodingTokensPerSecond) {
-        document.getElementById('generated-text-id').textContent = decodedText;
-        document.getElementById('stats').textContent = `Inference time: ${inferenceTime.toFixed(2)} ms, Prefill tokens/sec: ${prefillTokensPerSecond.toFixed(2)}, Decoding tokens/sec: ${decodingTokensPerSecond.toFixed(2)}`;
-      }
-
-
-
-    // Set up event listener for the Generate button
-    document.getElementById('generate-btn').addEventListener('click', () => {
-      const userText = document.getElementById('user-text').value.trim();
-      if (userText === "") {
-        alert("Please enter some text.");
-        return;
-      }
-      runInference(userText);
-    });
-  </script>
+  <h1>ONNX Runtime Web Inference - Performance Measurement</h1>
 </body>
 </html>
