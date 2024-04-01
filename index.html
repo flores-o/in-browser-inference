@@ -18,9 +18,14 @@
     async function initializeModelAndTokenizer() {
       const model = await tf.loadGraphModel('./models/Xenova/gpt2/tfjs_model/model.json');
       console.log('Model loaded');
+      console.log('Model inputs:', model.inputs); // Log the model's inputs
+      console.log('Model outputs:', model.outputs); // Log the model's outputs
+      console.log('Model inputs input name and input shape:', model.inputs.map(input => `${input.name}: [${input.shape}]`));
+
       const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
       return { model, tokenizer };
     }
+
 
     function prepareModelInputs(tokenizer, texts) {
       tokenizer.padding_side = 'left';
@@ -32,51 +37,59 @@
       return { input_ids, attention_mask, totalInputTokens: input_ids.data.length };
     }
 
-    function decodeResults(tokenizer, logitsTensor) {
-      const sequenceLength = logitsTensor.shape[1];
-      const logitsArray = logitsTensor.arraySync();
+    async function runInference(texts) {
+    try {
+      const { model, tokenizer } = await initializeModelAndTokenizer();
+
+      const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
+      console.log("Prepared input_ids:", input_ids);
+      console.log("Prepared attention_mask:", attention_mask);
+
+      // Convert BigInt64Array to regular number array
+      const inputIdsData = Array.from(input_ids.data, bigint => Number(bigint));
+      const attentionMaskData = Array.from(attention_mask.data, bigint => Number(bigint));
+
+      console.log("Converted input_ids.data:", inputIdsData);
+      console.log("Converted attention_mask.data:", attentionMaskData);
+
+      // Create tensors from the converted data
+      const inputIdsTensor = tf.tensor2d(inputIdsData, [1, inputIdsData.length], 'int32');
+      const attentionMaskTensor = tf.tensor2d(attentionMaskData, [1, attentionMaskData.length], 'int32');
+
+      console.log("Input IDs Tensor shape:", inputIdsTensor.shape);
+      console.log("Attention Mask Tensor shape:", attentionMaskTensor.shape);
+
+      // Check the content of the tensors
+      console.log("Input IDs Tensor data:", await inputIdsTensor.array());
+      console.log("Attention Mask Tensor data:", await attentionMaskTensor.array());
+
+      const logitsTensor = await model.executeAsync({ 
+        'input_ids': inputIdsTensor, 
+        'attention_mask': attentionMaskTensor 
+      });
+
+      // Convert logits to array for decoding
+      const logitsArray = await logitsTensor.array();
+      const decodedText = decodeResults(tokenizer, logitsArray);
+      console.log("Decoded Text:", decodedText.text);
+
+      displayResults(decodedText.text);
+    } catch (error) {
+      console.error('Inference error:', error);
+    }
+  }
+
+    // Updated the decodeResults function to take an array instead of a tensor
+    function decodeResults(tokenizer, logitsArray) {
+      // Assuming logitsArray is the output of the model already converted to a regular array
       let tokenIds = [];
-      for (let i = 0; i < sequenceLength; i++) {
+      for (let i = 0; i < logitsArray[0].length; i++) {
         let maxLogitIndex = logitsArray[0][i].indexOf(Math.max(...logitsArray[0][i]));
         tokenIds.push(maxLogitIndex);
       }
       const text = tokenizer.decode(tokenIds);
       return { decodedTokens: tokenIds.length, text };
     }
-
-    async function runInference(texts) {
-  try {
-    const { model, tokenizer } = await initializeModelAndTokenizer();
-    const { input_ids, attention_mask, totalInputTokens } = prepareModelInputs(tokenizer, texts);
-
-    // Log the original BigInt64Array data
-    console.log("Original input_ids.data:", input_ids.data);
-    console.log("Original attention_mask.data:", attention_mask.data);
-
-    // Convert BigInt64Array to an array of numbers with explicit conversion
-    const inputIdsData = Array.from(input_ids.data, bigint => Number(bigint));
-    const attentionMaskData = Array.from(attention_mask.data, bigint => Number(bigint));
-
-    // Log the converted data for verification
-    console.log("Converted input_ids.data:", inputIdsData);
-    console.log("Converted attention_mask.data:", attentionMaskData);
-
-    const inputIdsTensor = tf.tensor2d(inputIdsData, [1, inputIdsData.length], 'int32');
-    const attentionMaskTensor = tf.tensor2d(attentionMaskData, [1, attentionMaskData.length], 'int32');
-
-    console.log("inputIdsTensor shape:", inputIdsTensor.shape);
-    console.log("attentionMaskTensor shape:", attentionMaskTensor.shape);
-
-    const logitsTensor = model.predict({ input_ids: inputIdsTensor, attention_mask: attentionMaskTensor });
-
-    const decodedText = decodeResults(tokenizer, logitsTensor);
-    displayResults(decodedText.text);
-  } catch (error) {
-    console.error('Inference error:', error);
-  }
-}
-
-
 
     function displayResults(decodedText) {
       document.getElementById('generated-text-id').textContent = decodedText;
