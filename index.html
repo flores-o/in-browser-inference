@@ -1,31 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Tensorflow JS Inference</title>
+  <title>TensorFlow JS Inference - Performance Measurement</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-</head>
-<body>
-  <h1>Tensorflow JS Inference</h1>
-  <label for="user-text">Enter text:</label>
-  <input type="text" id="user-text" placeholder="Your text here" />
-  <button id="generate-btn">Generate</button>
-  <p>Generated text: <span id="generated-text-id"></span></p>
-  <p>Stats: <span id="stats"></span></p>
-
   <script type="module">
     import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
+    async function runInferenceBenchmark() {
+      const { model, tokenizer } = await initializeModelAndTokenizer();
+      const texts = ["Your sample text here"]; // Replace with your input
+      const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
+      const inputIdsTensor = tf.tensor2d(Array.from(input_ids.data, bigint => Number(bigint)), [1, input_ids.data.length], 'int32');
+      const attentionMaskTensor = tf.tensor2d(Array.from(attention_mask.data, bigint => Number(bigint)), [1, attention_mask.data.length], 'int32');
+
+      // Warm-up runs
+      for (let i = 0; i < 3; i++) {
+        await model.executeAsync({ 'input_ids': inputIdsTensor, 'attention_mask': attentionMaskTensor });
+      }
+
+      // Benchmark runs
+      const runTimes = [];
+      for (let i = 0; i < 10; i++) {
+        const startTime = performance.now();
+        await model.executeAsync({ 'input_ids': inputIdsTensor, 'attention_mask': attentionMaskTensor });
+        const endTime = performance.now();
+        runTimes.push(endTime - startTime);
+      }
+
+      // Calculate average time excluding warm-up
+      const averageTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
+      console.log(`Average Inference Time (TFJS): ${averageTime.toFixed(2)} ms`);
+    }
+
     async function initializeModelAndTokenizer() {
       const model = await tf.loadGraphModel('./models/Xenova/test_gpt2_web_model/model.json');
-      console.log('Model loaded');
-      console.log('Model inputs:', model.inputs); // Log the model's inputs
-      console.log('Model outputs:', model.outputs); // Log the model's outputs
-      console.log('Model inputs input name and input shape:', model.inputs.map(input => `${input.name}: [${input.shape}]`));
-
       const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
       return { model, tokenizer };
     }
-
 
     function prepareModelInputs(tokenizer, texts) {
       tokenizer.padding_side = 'left';
@@ -37,93 +48,12 @@
       return { input_ids, attention_mask, totalInputTokens: input_ids.data.length };
     }
 
-    async function runInference(texts) {
-    try {
-      const { model, tokenizer } = await initializeModelAndTokenizer();
-
-      const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
-      console.log("Prepared input_ids:", input_ids);
-      console.log("Prepared attention_mask:", attention_mask);
-
-      // Convert BigInt64Array to regular number array
-      const inputIdsData = Array.from(input_ids.data, bigint => Number(bigint));
-      const attentionMaskData = Array.from(attention_mask.data, bigint => Number(bigint));
-
-      console.log("Converted input_ids.data:", inputIdsData);
-      console.log("Converted attention_mask.data:", attentionMaskData);
-
-      // Create tensors from the converted data
-      const inputIdsTensor = tf.tensor2d(inputIdsData, [1, inputIdsData.length], 'int32');
-      const attentionMaskTensor = tf.tensor2d(attentionMaskData, [1, attentionMaskData.length], 'int32');
-
-      console.log("Input IDs Tensor shape:", inputIdsTensor.shape);
-      console.log("Attention Mask Tensor shape:", attentionMaskTensor.shape);
-
-      // Check the content of the tensors
-      console.log("Input IDs Tensor data:", await inputIdsTensor.array());
-      console.log("Attention Mask Tensor data:", await attentionMaskTensor.array());
-
-      const logitsTensor = await model.executeAsync({ 
-        'input_ids': inputIdsTensor, 
-        'attention_mask': attentionMaskTensor 
-      });
-
-      // Assuming logitsTensor contains all the outputs
-      const logits = logitsTensor.find(tensor => tensor.shape.length === 3);
-
-
-      // Log the type of logitsTensor
-      console.log("Type of logitsTensor:", typeof logitsTensor);
-
-      // Check if logitsTensor is an instance of tf.Tensor
-      if (logitsTensor instanceof tf.Tensor) {
-        console.log("logitsTensor is a TensorFlow.js tensor.");
-      // Log detailed tensor information
-        console.log("Tensor details:", logitsTensor.toString());
-      } else {
-        console.log("logitsTensor is NOT a TensorFlow.js tensor.");
-      }
-
-      // Log detailed information about logitsTensor
-      console.log("Detailed logitsTensor object:", logitsTensor);
-
-
-
-      // Convert logits to array for decoding
-      const logitsArray = await logits.array();
-      const decodedText = decodeResults(tokenizer, logitsArray);
-      console.log("Decoded Text:", decodedText.text);
-
-      displayResults(decodedText.text);
-    } catch (error) {
-      console.error('Inference error:', error);
-    }
-  }
-
-    // Updated the decodeResults function to take an array instead of a tensor
-    function decodeResults(tokenizer, logitsArray) {
-      // Assuming logitsArray is the output of the model already converted to a regular array
-      let tokenIds = [];
-      for (let i = 0; i < logitsArray[0].length; i++) {
-        let maxLogitIndex = logitsArray[0][i].indexOf(Math.max(...logitsArray[0][i]));
-        tokenIds.push(maxLogitIndex);
-      }
-      const text = tokenizer.decode(tokenIds);
-      return { decodedTokens: tokenIds.length, text };
-    }
-
-    function displayResults(decodedText) {
-      document.getElementById('generated-text-id').textContent = decodedText;
-    }
-
-    document.getElementById('generate-btn').addEventListener('click', () => {
-      const userText = document.getElementById('user-text').value.trim();
-      if (userText === "") {
-        alert("Please enter some text.");
-        return;
-      }
-      runInference(userText);
-    });
+    // Run the benchmark
+    runInferenceBenchmark();
   </script>
+</head>
+<body>
+  <h1>TensorFlow JS Inference - Performance Measurement</h1>
 </body>
 </html>
+
