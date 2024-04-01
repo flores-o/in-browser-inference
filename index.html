@@ -16,7 +16,7 @@
     import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
     async function initializeModelAndTokenizer() {
-      const model = await tf.loadGraphModel('./models/Xenova/gpt2/tfjs_model/model.json');
+      const model = await tf.loadGraphModel('./models/Xenova/test_gpt2_web_model/model.json');
       console.log('Model loaded');
       console.log('Model inputs:', model.inputs); // Log the model's inputs
       console.log('Model outputs:', model.outputs); // Log the model's outputs
@@ -68,8 +68,29 @@
         'attention_mask': attentionMaskTensor 
       });
 
+      // Assuming logitsTensor contains all the outputs
+      const logits = logitsTensor.find(tensor => tensor.shape.length === 3);
+
+
+      // Log the type of logitsTensor
+      console.log("Type of logitsTensor:", typeof logitsTensor);
+
+      // Check if logitsTensor is an instance of tf.Tensor
+      if (logitsTensor instanceof tf.Tensor) {
+        console.log("logitsTensor is a TensorFlow.js tensor.");
+      // Log detailed tensor information
+        console.log("Tensor details:", logitsTensor.toString());
+      } else {
+        console.log("logitsTensor is NOT a TensorFlow.js tensor.");
+      }
+
+      // Log detailed information about logitsTensor
+      console.log("Detailed logitsTensor object:", logitsTensor);
+
+
+
       // Convert logits to array for decoding
-      const logitsArray = await logitsTensor.array();
+      const logitsArray = await logits.array();
       const decodedText = decodeResults(tokenizer, logitsArray);
       console.log("Decoded Text:", decodedText.text);
 
