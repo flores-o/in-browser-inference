@@ -8,19 +8,19 @@
 
     async function runInferenceBenchmark() {
       const { model, tokenizer } = await initializeModelAndTokenizer();
-      const texts = ["Your sample text here"]; // Replace with your input
+      const texts = ["Your sample text here"]; // Replace with different input ?
       const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
       const inputIdsTensor = tf.tensor2d(Array.from(input_ids.data, bigint => Number(bigint)), [1, input_ids.data.length], 'int32');
       const attentionMaskTensor = tf.tensor2d(Array.from(attention_mask.data, bigint => Number(bigint)), [1, attention_mask.data.length], 'int32');
 
       // Warm-up runs
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 10; i++) {
         await model.executeAsync({ 'input_ids': inputIdsTensor, 'attention_mask': attentionMaskTensor });
       }
 
       // Benchmark runs
       const runTimes = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 100; i++) {
         const startTime = performance.now();
         await model.executeAsync({ 'input_ids': inputIdsTensor, 'attention_mask': attentionMaskTensor });
         const endTime = performance.now();
@@ -28,6 +28,7 @@
       }
 
       // Calculate average time excluding warm-up
+      // TFJS model inference time is in milliseconds 76.5 - 77.9 ms
       const averageTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
       console.log(`Average Inference Time (TFJS): ${averageTime.toFixed(2)} ms`);
     }
