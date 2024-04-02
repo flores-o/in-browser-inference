@@ -34,6 +34,8 @@
     }
 
     async function initializeModelAndTokenizer() {
+      // Model pretrained GPT2 from HF Transformers library -> Tensorflow -> Tensorflow JS
+      // See convert_to_tfjs.ipynb for conversion steps
       const model = await tf.loadGraphModel('./models/Xenova/test_gpt2_web_model/model.json');
       const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
       return { model, tokenizer };
