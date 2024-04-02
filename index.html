@@ -30,12 +30,14 @@
       }
 
       // Calculate average time excluding warm-up
+      // ONNX model inference time is in milliseconds 54.5 - 55.9 ms
       const averageTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
       console.log(`Average Inference Time (ONNX): ${averageTime.toFixed(2)} ms`);
     }
 
     async function initializeModelAndTokenizer() {
-      const session = await ort.InferenceSession.create('models/Xenova/gpt2/onnx/decoder_model_quantized.onnx');
+      // Model source https://huggingface.co/Xenova/gpt2/tree/main
+      const session = await ort.InferenceSession.create('models/Xenova/gpt2/onnx/decoder_model.onnx');
       const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
       return { session, tokenizer };
     }
