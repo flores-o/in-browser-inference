@@ -8,7 +8,7 @@
 
     async function runInferenceBenchmark() {
       const { session, tokenizer } = await initializeModelAndTokenizer();
-      const texts = ["Your sample text here"]; // Replace with your input
+      const texts = ["Your sample text here"]; // Replace with different input text
       const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
       const feeds = {
         input_ids: new ort.Tensor('int64', input_ids.data, [1, input_ids.data.length]),
@@ -16,13 +16,13 @@
       };
 
       // Warm-up runs
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 10; i++) {
         await session.run(feeds);
       }
 
       // Benchmark runs
       const runTimes = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 100; i++) {
         const startTime = performance.now();
         await session.run(feeds);
         const endTime = performance.now();
