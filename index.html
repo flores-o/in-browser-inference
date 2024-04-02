@@ -13,6 +13,15 @@
       const inputIdsTensor = tf.tensor2d(Array.from(input_ids.data, bigint => Number(bigint)), [1, input_ids.data.length], 'int32');
       const attentionMaskTensor = tf.tensor2d(Array.from(attention_mask.data, bigint => Number(bigint)), [1, attention_mask.data.length], 'int32');
 
+      // Perform one inference for sanity check
+      const logitsTensor = await model.executeAsync({ 'input_ids': inputIdsTensor, 'attention_mask': attentionMaskTensor });
+      const logits = logitsTensor.find(tensor => tensor.shape.length === 3); // Adjust based on your model's output
+      const logitsArray = await logits.array();
+      console.log(`Sanity Check Logits Shape: ${logits.shape}`);
+      console.log(`Sanity Check Logits Array: ${logitsArray}`);
+      const decodedResult = decodeResults(tokenizer, logitsArray);
+      console.log(`Sanity Check Decoded Result: ${decodedResult.text}`);
+
       // Warm-up runs
       for (let i = 0; i < 10; i++) {
         await model.executeAsync({ 'input_ids': inputIdsTensor, 'attention_mask': attentionMaskTensor });
@@ -49,6 +58,28 @@
         truncation: true,
       });
       return { input_ids, attention_mask, totalInputTokens: input_ids.data.length };
+    }
+
+    // Helper function to apply softmax to logits
+    function softmax(logits) {
+      const maxLogit = Math.max(...logits);
+      const scores = logits.map((l) => Math.exp(l - maxLogit));
+      const sum = scores.reduce((a, b) => a + b, 0);
+      return scores.map((s) => s / sum);
+    }
+
+    // Decode the output
+    function decodeResults(tokenizer, logitsArray) {
+      // logitsArray structure should match your model's output
+      let tokenIds = [];
+      for (let i = 0; i < logitsArray[0].length; i++) {
+        const logitsSlice = logitsArray[0][i];
+        const probabilities = softmax(logitsSlice);
+        const maxProbIndex = probabilities.indexOf(Math.max(...probabilities));
+        tokenIds.push(maxProbIndex);
+      }
+      const text = tokenizer.decode(tokenIds);
+      return { decodedTokens: tokenIds.length, text };
     }
 
     // Run the benchmark
