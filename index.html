@@ -2,13 +2,13 @@
 <html>
 <head>
   <title>ONNX Runtime Web Inference - Performance Measurement</title>
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.webgpu.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
   <script type="module">
     import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
     async function runInferenceBenchmark() {
       const { session, tokenizer } = await initializeModelAndTokenizer();
-      const texts = ['This is an example sentence', 'Each sentence is converted']
+      const texts = ["Your sample text here."]
       const { input_ids, token_type_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
       console.log("input_ids", input_ids.data);
       console.log("token_type_ids", token_type_ids.data);
@@ -22,9 +22,6 @@
       // Perform one inference for sanity check
       const result = await session.run(feeds);
       console.log(result);
-
-      // const decodedResult = decodeResult(result, tokenizer); // Assuming a decodeResult function exists
-      // console.log(`Sanity Check Decoded Result: ${decodedResult}`);
 
       // Warm-up runs
       for (let i = 0; i < 10; i++) {
@@ -41,13 +38,14 @@
       }
 
       // Calculate average time excluding warm-up
+      // For the input "Your sample text here." average time is around 19.8 - 19.89 ms
       const averageTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
       console.log(`Average Inference Time (ONNX): ${averageTime.toFixed(2)} ms`);
     }
 
     async function initializeModelAndTokenizer() {
       // Model source https://huggingface.co/Xenova/all-MiniLM-L6-v2
-      const session = await ort.InferenceSession.create('models/Xenova/all-MiniLM-L6-v2/onnx/model_fp16.onnx', { executionProviders: ['webgpu'], log_severity_level: 0 });
+      const session = await ort.InferenceSession.create('models/Xenova/all-MiniLM-L6-v2/onnx/model_fp16.onnx');
       const tokenizer = await AutoTokenizer.from_pretrained('Xenova/all-MiniLM-L6-v2');
       return { session, tokenizer };
     }
