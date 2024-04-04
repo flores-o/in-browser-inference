@@ -2,33 +2,29 @@
 <html>
 <head>
   <title>ONNX Runtime Web Inference - Performance Measurement</title>
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.webgpu.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
   <script type="module">
     import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
     async function runInferenceBenchmark() {
       const { session, tokenizer } = await initializeModelAndTokenizer();
-      const texts = ["Your sample text here."]; // Replace with different input text
-      const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
+      const texts = ['This is an example sentence', 'Each sentence is converted']
+      const { input_ids, token_type_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
+      console.log("input_ids", input_ids.data);
+      console.log("token_type_ids", token_type_ids.data);
+      console.log("attention_mask", attention_mask.data);
       const feeds = {
         input_ids: new ort.Tensor('int64', input_ids.data, [1, input_ids.data.length]),
+        token_type_ids: new ort.Tensor('int64', token_type_ids.data, [1, token_type_ids.data.length]),
         attention_mask: new ort.Tensor('int64', attention_mask.data, [1, attention_mask.data.length])
       };
 
       // Perform one inference for sanity check
       const result = await session.run(feeds);
-      console.log(`Session details ${JSON.stringify(session, null, 2)}`);
-      console.log(`ort.env.wasm: ${JSON.stringify(ort.env.wasm, null, 2)}`);
-      console.log(`ort.env.webgpu: ${JSON.stringify(ort.env.webgpu, null, 2)}`);
-      console.log(`ort.env.webgl: ${JSON.stringify(ort.env.webgl, null, 2)}`);
+      console.log(result);
 
-      // console.log(`Sanity Check result.logits: ${result.logits}`);
-      // console.log(`Sanity Check result.logits.data: ${result.logits.data}`);
-      console.log(`Sanity Check result.logits.data: ${result.logits.dims[0]}`);
-      console.log(`Sanity Check result.logits.data: ${result.logits.dims[1]}`);
-      console.log(`Sanity Check result.logits.data: ${result.logits.dims[2]}`);
-      const decodedResult = decodeResult(result, tokenizer); // Assuming a decodeResult function exists
-      console.log(`Sanity Check Decoded Result: ${decodedResult}`);
+      // const decodedResult = decodeResult(result, tokenizer); // Assuming a decodeResult function exists
+      // console.log(`Sanity Check Decoded Result: ${decodedResult}`);
 
       // Warm-up runs
       for (let i = 0; i < 10; i++) {
@@ -50,58 +46,21 @@
     }
 
     async function initializeModelAndTokenizer() {
-      // Model source https://huggingface.co/Xenova/gpt2/tree/main
-      const session = await ort.InferenceSession.create('models/Xenova/gpt2/onnx/decoder_model.onnx', { executionProviders: ['webgpu'] });
-      const tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2');
+      // Model source https://huggingface.co/Xenova/all-MiniLM-L6-v2
+      const session = await ort.InferenceSession.create('models/Xenova/all-MiniLM-L6-v2/onnx/model.onnx');
+      const tokenizer = await AutoTokenizer.from_pretrained('Xenova/all-MiniLM-L6-v2');
       return { session, tokenizer };
     }
 
     function prepareModelInputs(tokenizer, texts) {
-      tokenizer.padding_side = 'left';
-      const { input_ids, attention_mask } = tokenizer(texts, {
-        add_special_tokens: false,
+
+      const { input_ids, token_type_ids, attention_mask } = tokenizer(texts, {
         padding: true,
         truncation: true,
+        return_tensors: 'pt'
       });
-      return { input_ids, attention_mask, totalInputTokens: input_ids.data.length };
+      return { input_ids, token_type_ids, attention_mask };
     }
-
-    // Helper function to apply softmax to logits
-    function softmax(logits) {
-      const maxLogit = Math.max(...logits);
-      const scores = logits.map((l) => Math.exp(l - maxLogit));
-      const sum = scores.reduce((a, b) => a + b, 0);
-      return scores.map((s) => s / sum);
-    }
-
-    // Decoding the output
-    function decodeResult(result, tokenizer) {
-      // Assuming result.logits is a 3D tensor [batch_size, sequence_length, vocab_size]
-      // and we're interested in the first item in the batch
-      const logits = result.logits.data;
-      const sequenceLength = result.logits.dims[1];
-      const vocabSize = result.logits.dims[2];
-      let tokenIds = [];
-
-      for (let i = 0; i < sequenceLength; i++) {
-        // Extract the logits for the current position in the sequence
-        const sliceStart = i * vocabSize;
-        const sliceEnd = sliceStart + vocabSize;
-        const logitsSlice = logits.slice(sliceStart, sliceEnd);
-
-        // Apply softmax to convert logits to probabilities
-        const probabilities = softmax(logitsSlice);
-
-        // Get the token ID with the highest probability
-        const maxProbIndex = probabilities.indexOf(Math.max(...probabilities));
-        tokenIds.push(maxProbIndex);
-      }
-
-      // Decode the sequence of token IDs to text
-      const decodedText = tokenizer.decode(tokenIds);
-      return decodedText;
-    }
-
 
     // Run the benchmark
     runInferenceBenchmark();
