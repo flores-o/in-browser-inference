@@ -8,7 +8,7 @@
 
     async function runInferenceBenchmark() {
       const { session, tokenizer } = await initializeModelAndTokenizer();
-      const texts = ["Your sample text here."]
+      const texts = ["Mr. and Mrs. Dursley, of number four, Privet Drive, were proud to say that they were perfectly normal, thank you very much. They were the last people you'd expect to be involved in anything strange or mysterious, because they just didn't hold with such nonsense. Mr. Dursley was the director of a firm called Grunnings, which made drills. He was a big, beefy man with hardly any neck, although he did have a very large mustache. Mrs. Dursley was thin and blonde and had nearly twice the usual amount of neck, which came in very useful as she spent so"];
       const { input_ids, token_type_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
       console.log("input_ids", input_ids.data);
       console.log("token_type_ids", token_type_ids.data);
@@ -38,7 +38,7 @@
       }
 
       // Calculate average time excluding warm-up
-      // Average time app 10 ms on an Apple M1 Pro, GPU 16 core
+      // Average time 12.2 - 16 ms on an Apple M1 Pro, GPU 16 core
       const averageTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
       console.log(`Average Inference Time (ONNX): ${averageTime.toFixed(2)} ms`);
     }
@@ -55,6 +55,7 @@
       const { input_ids, token_type_ids, attention_mask } = tokenizer(texts, {
         padding: true,
         truncation: true,
+        max_length: 128,
         return_tensors: 'pt'
       });
       return { input_ids, token_type_ids, attention_mask };
