@@ -8,7 +8,7 @@
 
     async function runInferenceBenchmark() {
       const { session, tokenizer } = await initializeModelAndTokenizer();
-      const texts = ["That's what we do here. We've been doing it since May 2001. Which, by our reckoning, makes us the web's oldest daily writing project.Not sure where to begin? Try reading a few entries. Pick your favorite date or read a random entry. Or browse our writer profiles. Some of our members have been writing here nonstop for more than 10 years.Then, of course, when the next batch starts on the 1st of the month, click "]
+      const texts = ["Your sample text here."]
       const { input_ids, token_type_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
       console.log("input_ids", input_ids.data);
       console.log("token_type_ids", token_type_ids.data);
