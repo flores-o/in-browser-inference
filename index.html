@@ -2,13 +2,19 @@
 <html>
 <head>
   <title>TensorFlow JS Inference - Performance Measurement</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
+  <!-- Add the WebGPU backend to the global backend registry -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgpu/dist/tf-backend-webgpu.js"></script>
+
   <script type="module">
     import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
     async function runInferenceBenchmark() {
+      console.log('Running Inference Benchmark');
+      console.log('tf.getBackend()', tf.getBackend())
+
       const { model, tokenizer } = await initializeModelAndTokenizer();
-      const texts = ["Your sample text here"]; // Replace with different input ?
+      const texts = ["Your sample text here"]; // Replace with different input
       const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
       const inputIdsTensor = tf.tensor2d(Array.from(input_ids.data, bigint => Number(bigint)), [1, input_ids.data.length], 'int32');
       const attentionMaskTensor = tf.tensor2d(Array.from(attention_mask.data, bigint => Number(bigint)), [1, attention_mask.data.length], 'int32');
@@ -37,7 +43,7 @@
       }
 
       // Calculate average time excluding warm-up
-      // TFJS model inference time is in milliseconds 76.5 - 77.9 ms
+      // TFJS WebGPU model inference time is in milliseconds 16.10 - 16.99 ms
       const averageTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
       console.log(`Average Inference Time (TFJS): ${averageTime.toFixed(2)} ms`);
     }
@@ -83,7 +89,8 @@
     }
 
     // Run the benchmark
-    runInferenceBenchmark();
+    // Set the backend to WebGPU and wait for the module to be ready
+    tf.setBackend('webgpu').then(() => runInferenceBenchmark());
   </script>
 </head>
 <body>
