@@ -1,10 +1,15 @@
 **Running the demo:**
 
+
+```
+Check other branches for different backends, execution providers and models
+```
+
 ```
 As a temporary workaround to get the model weights
 
 # run the following from root 
-# git checkout gpt2-onnx
+
 cd models/Xenova
 git clone https://huggingface.co/Xenova/all-MiniLM-L6-v2
 ```
