@@ -8,7 +8,7 @@
 
     async function runInferenceBenchmark() {
       const { session, tokenizer } = await initializeModelAndTokenizer();
-      const texts = ["Your sample text here."]; // Replace with different input text
+      const texts = ["Your sample text here"]; // Replace with different input text
       const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
       const feeds = {
         input_ids: new ort.Tensor('int64', input_ids.data, [1, input_ids.data.length]),
@@ -24,9 +24,9 @@
 
       // console.log(`Sanity Check result.logits: ${result.logits}`);
       // console.log(`Sanity Check result.logits.data: ${result.logits.data}`);
-      console.log(`Sanity Check result.logits.data: ${result.logits.dims[0]}`);
-      console.log(`Sanity Check result.logits.data: ${result.logits.dims[1]}`);
-      console.log(`Sanity Check result.logits.data: ${result.logits.dims[2]}`);
+      console.log(`Sanity Check result.logits.dims[0]: ${result.logits.dims[0]}`);
+      console.log(`Sanity Check result.logits.dims[1]: ${result.logits.dims[1]}`);
+      console.log(`Sanity Check result.logits.dims[2]: ${result.logits.dims[2]}`);
       const decodedResult = decodeResult(result, tokenizer); // Assuming a decodeResult function exists
       console.log(`Sanity Check Decoded Result: ${decodedResult}`);
 
@@ -45,6 +45,7 @@
       }
 
       // Calculate average time excluding warm-up
+      // Average Inference Time (ONNX): 54.17 ms WASM
       const averageTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
       console.log(`Average Inference Time (ONNX): ${averageTime.toFixed(2)} ms`);
     }
