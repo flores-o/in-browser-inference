@@ -8,7 +8,7 @@
 
     async function runInferenceBenchmark() {
       const { session, tokenizer } = await initializeModelAndTokenizer();
-      const texts = ["Your sample text here."]; // Replace with different input text
+      const texts = ["Your sample text here"]; // Replace with different input text
       const { input_ids, attention_mask } = prepareModelInputs(tokenizer, texts);
       const feeds = {
         input_ids: new ort.Tensor('int64', input_ids.data, [1, input_ids.data.length]),
@@ -45,6 +45,7 @@
       }
 
       // Calculate average time excluding warm-up
+      // Average Inference Time (ONNX): 128.48 ms WEBGPU
       const averageTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
       console.log(`Average Inference Time (ONNX): ${averageTime.toFixed(2)} ms`);
     }
